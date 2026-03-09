@@ -37,6 +37,50 @@ This repository has several branches targeting different middleware stacks and h
 
 > **Note:** The `ros2-integration` branch represents the most up-to-date, minimal ROS 2 port rebased on `main`. The `ros2-edubot` and `ros2-sim` branches are earlier experimental ports with platform-specific changes.
 
+### Isaac Sim Quick Start (ROS 2 branches)
+
+All three ROS 2 branches (`ros2-integration`, `ros2-edubot`, `ros2-sim`) are designed to work with [NVIDIA Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) running a TurtleBot3. The general setup flow is:
+
+**1. Install prerequisites**
+- [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/index.html)
+- [ROS 2 Humble](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_ros.html#isaac-sim-app-install-ros) (with Isaac Sim ROS 2 bridge enabled)
+- [tmux](https://github.com/tmux/tmux/wiki/Installing) (recommended)
+
+**2. Set up TurtleBot3 in Isaac Sim**
+- Import the TurtleBot3 URDF — see [URDF Import: Turtlebot](https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/tutorial_ros2_turtlebot.html)
+- Create a ROS 2 OmniGraph with:
+  - `/cmd_vel` subscriber — see [Driving TurtleBot via ROS2 messages](https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/tutorial_ros2_drive_turtlebot.html)
+  - `/rgb` camera publisher — see [ROS2 Cameras](https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/tutorial_ros2_camera.html)
+  - (Optional) `/odom` publisher — see [Setting up Odometry](https://docs.omniverse.nvidia.com/isaacsim/latest/ros2_tutorials/tutorial_ros2_tf.html#setting-up-odometry)
+
+**3. Install Python dependencies** (inside the `vint_release/` directory)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e train/
+git clone git@github.com:real-stanford/diffusion_policy.git
+pip install -e diffusion_policy/
+```
+
+**4. Download model weights**
+
+Save the `*.pth` weights from [this link](https://drive.google.com/drive/folders/1a9yWR2iooXFAqjQHetz263--4_2FFggg?usp=sharing) into `vint_release/deployment/model_weights/`.
+
+**5. Record a topological map** (inside `vint_release/deployment/src/`)
+```bash
+# Teleoperate the robot to record a trajectory
+./record_bag.sh <bag_name>
+
+# Convert the bag into a topological map
+./create_topomap.sh <topomap_name> <bag_filename>
+```
+
+**6. Run navigation** (inside `vint_release/deployment/src/`)
+```bash
+./navigate.sh "--model <model_name> --dir <topomap_dir>"
+```
+
 ## Train
 
 This subfolder contains code for processing datasets and training models from your own data.
