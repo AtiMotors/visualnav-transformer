@@ -37,6 +37,105 @@ This repository has several branches targeting different middleware stacks and h
 
 > **Note:** The `ros2-integration` branch represents the most up-to-date, minimal ROS 2 port rebased on `main`. The `ros2-edubot` and `ros2-sim` branches are earlier experimental ports with platform-specific changes.
 
+### Edubot in Isaac Sim
+
+This section covers bringing the Edubot differential-drive robot into Isaac Sim and connecting it to the `ros2-edubot` navigation stack.
+
+#### Prerequisites
+
+- [Isaac Sim 2023.1.1](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html) installed via the Omniverse Launcher
+- `ISAAC_PATH` set in `~/.bashrc`:
+  ```bash
+  export ISAAC_PATH=~/.local/share/ov/pkg/isaac-sim-2023.1.1
+  ```
+- ROS 2 Humble with the Isaac Sim ROS 2 bridge enabled (see [Isaac Sim ROS 2 setup](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_ros.html#isaac-sim-app-install-ros))
+- The [`isaac_sim`](https://github.com/AtiMotors/isaac_sim) repository cloned into the Isaac Sim directory:
+  ```bash
+  cd $ISAAC_PATH && mkdir -p ati_sim && cd ati_sim
+  git clone https://github.com/AtiMotors/isaac_sim.git
+  ```
+- ZMQ installed in the Isaac Sim Python environment:
+  ```bash
+  $ISAAC_PATH/python.sh -m pip install zmq
+  ```
+
+#### Edubot USD Model
+
+The Edubot simulation model (`edubot_cyl_imu.usd`) must be placed at:
+```
+$ISAAC_PATH/ati_sim/isaac_sim/assets/robots/edubot/edubot_cyl_imu.usd
+```
+
+The model has two revolute wheel joints (`left_wheel_revolute`, `right_wheel_revolute`) and an IMU sensor. It is configured in `isaac_sim/config/parent_config.json` under the `"edubot"` key with drives enabled and lidar/camera disabled (sensors are wired up via OmniGraph at runtime).
+
+#### Configuring the Simulation
+
+In `isaac_sim/config/config_warehouse.json`, set the model to `"edubot"` and choose an environment:
+
+```json
+{
+    "robots_to_be_added": [{"name": "robot_y",
+                            "model": "edubot",
+                            "station": 1,
+                            "zmq_address": {"camera": 5550},
+                            "id": 0}],
+    "env_to_be_used": "large_warehouse_2people"
+}
+```
+
+The available environments (defined in `parent_config.json`) include `large_warehouse_2people` and `simple_warehouse_single_alley`.
+
+#### Launching the Simulation
+
+Run the simulation from the Isaac Sim directory using its embedded Python:
+
+```bash
+cd $ISAAC_PATH
+./python.sh ati_sim/isaac_sim/startAtiSim.py
+```
+
+The `startAtiSim.py` script:
+1. Loads the Edubot USD model into the selected environment
+2. Sets up a ROS 2 OmniGraph (`/ActionGraph`) with the following nodes:
+   - **Camera publisher** — publishes `/rgb` (640×480) and `/depth` topics
+   - **Twist subscriber** — subscribes to `/cmd_vel` and drives the robot via a differential controller (wheel distance: 0.4 m, wheel radius: 0.1 m, max linear speed: 0.5 m/s)
+   - **Odometry publisher** — publishes `/odom`
+   - **IMU publisher** — reads the onboard IMU and publishes to `/imu`
+3. Steps the simulation loop and prints FPS
+
+Once running, press **Play** in the Isaac Sim GUI to start physics simulation.
+
+#### ROS 2 Topics
+
+| Topic    | Type                        | Direction         | Description                  |
+|----------|-----------------------------|-------------------|------------------------------|
+| `/rgb`   | `sensor_msgs/Image`         | Isaac Sim → ROS 2 | Forward-facing camera (model input) |
+| `/depth` | `sensor_msgs/Image`         | Isaac Sim → ROS 2 | Depth camera                 |
+| `/cmd_vel` | `geometry_msgs/Twist`     | ROS 2 → Isaac Sim | Velocity commands from the navigation model |
+| `/odom`  | `nav_msgs/Odometry`         | Isaac Sim → ROS 2 | Wheel odometry               |
+| `/imu`   | `sensor_msgs/Imu`           | Isaac Sim → ROS 2 | IMU data                     |
+
+The navigation stack on the `ros2-edubot` branch reads `/rgb` for observations and publishes to `/cmd_vel`, so no topic remapping is needed.
+
+#### Running Navigation in Simulation
+
+Once Isaac Sim is running and the robot is playing, follow the standard deployment steps (inside `vint_release/deployment/src/`):
+
+```bash
+# Record a topological map by teleoperating the robot
+./record_bag.sh <bag_name>
+
+# Convert the bag to a topological map
+./create_topomap.sh <topomap_name> <bag_filename>
+
+# Run visual navigation
+./navigate.sh "--model <model_name> --dir <topomap_dir>"
+```
+
+See the [Isaac Sim Quick Start](#isaac-sim-quick-start-ros-2-branches) section for Python environment and model weight setup.
+
+---
+
 ### Isaac Sim Quick Start (ROS 2 branches)
 
 All three ROS 2 branches (`ros2-integration`, `ros2-edubot`, `ros2-sim`) are designed to work with [NVIDIA Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) running a TurtleBot3. The general setup flow is:
