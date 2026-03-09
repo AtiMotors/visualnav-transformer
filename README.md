@@ -24,6 +24,19 @@ This repository contains code for training our family of models with your own da
 - `./deployment/src/navigate.sh`: script that deploys a trained GNM/ViNT/NoMaD model on the robot to navigate to a desired goal in the generated topological graph. Please see relevant sections below for configuration settings.
 - `./deployment/src/explore.sh`: script that deploys a trained NoMaD model on the robot to randomly explore its environment. Please see relevant sections below for configuration settings.
 
+## Branches
+
+This repository has several branches targeting different middleware stacks and hardware platforms:
+
+| Branch | Description |
+|--------|-------------|
+| [`main`](https://github.com/robodhruv/visualnav-transformer/tree/main) | **Default branch.** Original ROS 1 (Noetic) codebase with training and deployment code for GNM, ViNT, and NoMaD on LoCoBot. |
+| [`ros2-integration`](https://github.com/robodhruv/visualnav-transformer/tree/ros2-integration) | Clean port of the deployment stack to **ROS 2**. Branched from `main` with a single commit porting the deployment scripts and nodes to ROS 2 conventions. |
+| [`ros2-edubot`](https://github.com/robodhruv/visualnav-transformer/tree/ros2-edubot) | ROS 2 deployment adapted for the **Edubot** robot platform. Includes ROS 2 bag processing (removing the ROS 1 `rosbag` dependency), Edubot-specific navigation tuning, topomap creation for ROS 2, and a `requirements.txt` for the deployment environment. |
+| [`ros2-sim`](https://github.com/robodhruv/visualnav-transformer/tree/ros2-sim) | ROS 2 deployment targeting **simulation** environments. Shares the core ROS 2 navigation and topomap work from `ros2-edubot` with simulation-specific frequency/timing adjustments. |
+
+> **Note:** The `ros2-integration` branch represents the most up-to-date, minimal ROS 2 port rebased on `main`. The `ros2-edubot` and `ros2-sim` branches are earlier experimental ports with platform-specific changes.
+
 ## Train
 
 This subfolder contains code for processing datasets and training models from your own data.
