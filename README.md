@@ -286,6 +286,87 @@ This command opens up 4 windows:
 When the robot is finishing navigating, kill the `pd_controller.py` script, and then kill the tmux session. If you want to take control of the robot while it is navigating, the `joy_teleop.py` script allows you to do so with the joystick.
 
 
+### Simulation with Isaac Sim (ROS 2)
+
+This branch supports running ViNT inside **NVIDIA Isaac Sim** with **ROS 2 Humble** on Ubuntu 22.04. The simulation replaces the physical robot and camera with Isaac Sim's OmniGraph ROS 2 bridge.
+
+#### Prerequisites
+
+- Ubuntu 22.04
+- [ROS 2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
+- [NVIDIA Isaac Sim](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html) with the ROS 2 bridge extension enabled
+- Python dependencies from `deployment/requirements.txt`
+
+#### Isaac Sim Setup
+
+1. Configure FastDDS so Isaac Sim and ROS 2 can communicate. Create `~/.ros/fastdds.xml` following the [Isaac Sim ROS 2 guide](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_ros.html), then export it before launching:
+    ```bash
+    unset LD_LIBRARY_PATH
+    export FASTRTPS_DEFAULT_PROFILES_FILE=~/.ros/fastdds.xml
+    ```
+
+2. Launch Isaac Sim:
+    ```bash
+    ./isaac-sim.sh
+    ```
+
+3. Inside Isaac Sim, set up an OmniGraph that:
+    - Subscribes to `/cmd_vel` (Twist) and forwards it to the robot's ArticulationController
+    - Publishes the robot's camera image to `/sim_camera/rgb` (sensor_msgs/Image)
+
+4. Press **Play** in Isaac Sim. Verify topics are live:
+    ```bash
+    source /opt/ros/humble/setup.bash
+    ros2 topic list
+    ```
+    You should see `/sim_camera/rgb` and `/cmd_vel`.
+
+#### Collecting a Topological Map in Simulation
+
+Manually drive the robot in Isaac Sim (e.g. by publishing Twist commands) along the desired path, then run from `deployment/src/`:
+
+```bash
+python create_topomap.py --dt 1 --dir <topomap_name>
+```
+
+This saves one image per second from `/sim_camera/rgb` into `deployment/topomaps/images/<topomap_name>/`. Stop the script once the path is complete.
+
+#### Running Navigation in Simulation
+
+From `deployment/src/`, open two terminals:
+
+**Terminal 1** — Run the navigation model:
+```bash
+python navigate.py --model vint --dir <topomap_name> --goal-node <N>
+```
+Use `--goal-node -1` to navigate to the last node in the map (default).
+
+**Terminal 2** — Run the PD controller:
+```bash
+python pd_controller.py
+```
+
+The navigation node reads images from `/sim_camera/rgb`, infers waypoints, and publishes them to `/waypoint`. The PD controller converts waypoints into `/cmd_vel` commands sent to Isaac Sim.
+
+Key simulation parameters (edit `deployment/config/robot.yaml`):
+- `max_v`: maximum linear velocity (m/s), default `0.3`
+- `max_w`: maximum angular velocity (rad/s), default `0.3`
+- `frame_rate`: observation rate in Hz, default `4`
+
+Alternatively, use the convenience script which launches both in a tmux session:
+```bash
+./navigate.sh "--dir <topomap_name> --model vint -g <goal_node>"
+```
+
+#### Visualizing the Robot's Path
+
+To visualize the odometry trail in RViz2:
+```bash
+python publish_path.py
+rviz2
+```
+Add a `Path` display on topic `/path`.
+
 ### Adapting this code to different robots
 
 We hope that this codebase is general enough to allow you to deploy it to your favorite ROS-based robots. You can change the robot configuration parameters in `vint_release/deployment/config/robot.yaml`, like the max angular and linear velocities of the robot and the topics to publish to teleop and control the robot. Please feel free to create a Github Issue or reach out to the authors at shah@cs.berkeley.edu.
